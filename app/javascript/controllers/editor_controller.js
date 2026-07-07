@@ -108,7 +108,7 @@ export default class extends Controller {
     document.addEventListener("keydown", this.boundKeydown)
 
     this.boundPointerMove = this.pointerMove.bind(this)
-    this.overlayCanvasTarget.addEventListener("mousemove", this.boundPointerMove)
+    this.editorMainTarget.addEventListener("mousemove", this.boundPointerMove)
 
     this.boundBrushDown = this.brushPointerDown.bind(this)
     this.overlayCanvasTarget.addEventListener("mousedown", this.boundBrushDown)
@@ -125,7 +125,7 @@ export default class extends Controller {
 
   disconnect() {
     document.removeEventListener("keydown", this.boundKeydown)
-    this.overlayCanvasTarget.removeEventListener("mousemove", this.boundPointerMove)
+    this.editorMainTarget.removeEventListener("mousemove", this.boundPointerMove)
     this.overlayCanvasTarget.removeEventListener("mousedown", this.boundBrushDown)
     window.removeEventListener("mouseup", this.boundBrushUp)
     this.overlayCanvasTarget.removeEventListener("mouseleave", this.boundBrushLeave)
@@ -367,7 +367,7 @@ export default class extends Controller {
     this.toleranceControlTarget.hidden = !["fuzzy_select", "gradient_select", "select_by_color"].includes(this.tool)
     this.brushSizeControlTarget.hidden = this.tool !== "line_select" && this.tool !== "brush"
     this.brushSubmitControlTarget.hidden = this.tool !== "brush"
-    this.overlayCanvasTarget.classList.toggle("zoom-cursor", this.tool === "zoom")
+    this.editorMainTarget.classList.toggle("zoom-cursor", this.tool === "zoom")
     if (this.tool === "brush") {
       this.renderBrushCanvas()
     } else {
@@ -687,11 +687,19 @@ export default class extends Controller {
     return this.fuzzySelectUrlValue
   }
 
+  // Clicks outside the canvas (GIMP allows this, e.g. to place a free-select
+  // vertex past the image edge without having to hit the edge pixel exactly)
+  // are clamped to the nearest in-bounds pixel rather than left negative or
+  // beyond width/height, so every downstream consumer of these coordinates
+  // (Python rasterization, overlay preview math) only ever sees valid points.
   eventToImageCoordinates(event) {
     const rect = this.overlayCanvasTarget.getBoundingClientRect()
     const x = Math.round((event.clientX - rect.left) * (this.overlayCanvasTarget.width / rect.width))
     const y = Math.round((event.clientY - rect.top) * (this.overlayCanvasTarget.height / rect.height))
-    return { x, y }
+    return {
+      x: Math.min(Math.max(x, 0), this.overlayCanvasTarget.width - 1),
+      y: Math.min(Math.max(y, 0), this.overlayCanvasTarget.height - 1),
+    }
   }
 
   // GIMP-style free select (lasso): each click adds a vertex to the

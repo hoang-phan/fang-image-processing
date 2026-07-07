@@ -529,6 +529,11 @@ body {
   display: flex;
   overflow: auto;
   padding: 2rem;
+  cursor: crosshair;
+}
+
+.editor-main.zoom-cursor {
+  cursor: zoom-in;
 }
 
 .canvas-stack {
@@ -563,11 +568,6 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  cursor: crosshair;
-}
-
-.canvas-stack canvas[data-editor-target="overlayCanvas"].zoom-cursor {
-  cursor: zoom-in;
 }
 
 
