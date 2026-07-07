@@ -1,0 +1,613 @@
+/*
+ * This is a manifest file that'll be compiled into application.css.
+ *
+ * With Propshaft, assets are served efficiently without preprocessing steps. You can still include
+ * application-wide styles in this file, but keep in mind that CSS precedence will follow the standard
+ * cascading order, meaning styles declared later in the document or manifest will override earlier ones,
+ * depending on specificity.
+ *
+ * Consider organizing styles into separate files for maintainability.
+ */
+
+:root {
+  --gimp-bg: #2c2c2c;
+  --gimp-panel: #3a3a3a;
+  --gimp-panel-border: #232323;
+  --gimp-text: #d8d8d8;
+  --gimp-text-dim: #9a9a9a;
+  --gimp-accent: #5c9fe0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--gimp-bg);
+  color: var(--gimp-text);
+}
+
+/* --- Landing page (kept light, only the editor goes dark/GIMP-style) --- */
+.landing-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.landing-card {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  color: #222;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  padding: 2.5rem;
+  text-align: center;
+}
+
+.landing-card h1 {
+  margin-top: 0;
+}
+
+.landing-card p {
+  color: #555;
+  margin-bottom: 2rem;
+}
+
+.dropzone-button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.5rem 1rem;
+  background: #fafafa;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  color: #444;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.dropzone-button i {
+  font-size: 2rem;
+  color: #999;
+}
+
+.dropzone-button:hover {
+  background: #f0f6ff;
+  border-color: var(--gimp-accent);
+}
+
+.dropzone-button:hover i {
+  color: var(--gimp-accent);
+}
+
+.load-session-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.7rem 1rem;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  color: #333;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.load-session-button:hover {
+  background: #f5f5f5;
+}
+
+/* --- Global session upload/load UI (shared layout, both pages) --- */
+.hidden-upload-form {
+  display: none;
+}
+
+.load-session-dialog {
+  width: min(480px, 90vw);
+  max-height: 80vh;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--gimp-panel);
+  color: var(--gimp-text);
+}
+
+.load-session-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--gimp-panel-border);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.dialog-close-button {
+  background: transparent;
+  border: none;
+  color: var(--gimp-text-dim);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.dialog-close-button:hover {
+  color: var(--gimp-text);
+}
+
+.dialog-body {
+  padding: 0.75rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  max-height: calc(80vh - 4rem);
+}
+
+.border-size-dialog {
+  width: min(320px, 90vw);
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--gimp-panel);
+  color: var(--gimp-text);
+}
+
+.border-size-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.dialog-button {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--gimp-text);
+  border: 1px solid var(--gimp-panel-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dialog-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dialog-button-primary {
+  background: var(--gimp-accent);
+  border-color: var(--gimp-accent);
+  color: #fff;
+}
+
+.dialog-button-primary:hover {
+  background: var(--gimp-accent);
+  filter: brightness(1.1);
+}
+
+.session-list-empty {
+  color: var(--gimp-text-dim);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.session-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem;
+  border-radius: 6px;
+}
+
+.session-list-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.session-list-link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--gimp-text);
+  text-decoration: none;
+  min-width: 0;
+}
+
+.session-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 4px;
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  background-color: #fff;
+  flex-shrink: 0;
+}
+
+.session-date {
+  font-size: 0.85rem;
+  color: var(--gimp-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-delete-button {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--gimp-text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.session-delete-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e05c5c;
+}
+
+.merge-selection-dialog {
+  width: min(360px, 90vw);
+  max-height: 80vh;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--gimp-panel);
+  color: var(--gimp-text);
+}
+
+.merge-selection-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.saved-selection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.saved-selection-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem;
+  border-radius: 6px;
+}
+
+.saved-selection-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.saved-selection-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.saved-selection-item span {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--gimp-text-dim);
+}
+
+.saved-selection-empty {
+  color: var(--gimp-text-dim);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+/* --- Editor shell: left sidebar (tools + tool options + functions), right canvas area --- */
+.editor-shell {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "sidebar main"
+    "sidebar statusbar";
+  height: 100vh;
+}
+
+.editor-sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  background: var(--gimp-panel);
+  border-right: 1px solid var(--gimp-panel-border);
+  overflow-y: auto;
+}
+
+/* --- Top of sidebar: the toolbox (tool icons) --- */
+.editor-toolbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--gimp-panel-border);
+}
+
+.tool-button,
+.function-button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  background: transparent;
+  color: var(--gimp-text);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tool-button:hover,
+.function-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tool-button.active {
+  background: var(--gimp-accent);
+  border-color: var(--gimp-accent);
+  color: #fff;
+}
+
+.tool-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--gimp-panel-border);
+  margin: 0 0.15rem;
+}
+
+/* --- Middle of sidebar: tool options for the active tool --- */
+.editor-tool-options {
+  padding: 0.6rem 0.75rem;
+}
+
+.tool-options-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gimp-text-dim);
+  margin-bottom: 0.6rem;
+}
+
+.tool-option-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tool-option-row[hidden] {
+  display: none;
+}
+
+.tool-option-row label {
+  font-size: 0.8rem;
+  color: var(--gimp-text-dim);
+}
+
+.stepper-field {
+  display: flex;
+  align-items: stretch;
+}
+
+.stepper-input {
+  flex: 1;
+  width: 0;
+  background: var(--gimp-bg);
+  color: var(--gimp-text);
+  border: 1px solid var(--gimp-panel-border);
+  border-right: none;
+  border-radius: 3px 0 0 3px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.stepper-buttons {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--gimp-panel-border);
+  border-radius: 0 3px 3px 0;
+  overflow: hidden;
+}
+
+.stepper-button {
+  width: 1.4rem;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  background: var(--gimp-bg);
+  color: var(--gimp-text-dim);
+  border: none;
+  border-top: 1px solid var(--gimp-panel-border);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.stepper-button:first-child {
+  border-top: none;
+}
+
+.stepper-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gimp-text);
+}
+
+.tool-option-slider {
+  width: 100%;
+}
+
+/* --- Bottom of sidebar: non-tool functions (select all, undo, download, etc.) --- */
+.editor-functions {
+  margin-top: auto;
+  padding: 0.6rem 0.75rem;
+  border-top: 1px solid var(--gimp-panel-border);
+}
+
+.function-button-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/* Brush tool's Add/Remove/New submission buttons need a readable label next
+   to the icon (unlike the icon-only Functions row), so they can't reuse the
+   fixed 36x36 .function-button square — sized to fit "Add"/"Remove"/"New" on
+   one row within the sidebar's width instead. */
+.brush-submit-button-list {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.brush-submit-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 32px;
+  padding: 0 0.4rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--gimp-text);
+  border: 1px solid var(--gimp-panel-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.brush-submit-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* --- Main canvas area --- */
+.editor-main {
+  grid-area: main;
+  display: flex;
+  overflow: auto;
+  padding: 2rem;
+}
+
+.canvas-stack {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  margin: auto;
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-color: #fff;
+  box-shadow: 0 0 0 1px var(--gimp-panel-border);
+  transform-origin: top left;
+}
+
+.canvas-stack canvas {
+  display: block;
+}
+
+.canvas-stack canvas[data-editor-target="brushCanvas"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.canvas-stack canvas[data-editor-target="overlayCanvas"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: crosshair;
+}
+
+.canvas-stack canvas[data-editor-target="overlayCanvas"].zoom-cursor {
+  cursor: zoom-in;
+}
+
+
+/* --- Status bar --- */
+.editor-statusbar {
+  grid-area: statusbar;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0.75rem;
+  background: var(--gimp-panel);
+  border-top: 1px solid var(--gimp-panel-border);
+  font-size: 0.8rem;
+  color: var(--gimp-text-dim);
+}
+
+.editor-statusbar .spacer {
+  flex: 1;
+}
+
+.editor-statusbar .zoom-level {
+  color: var(--gimp-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar-button {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--gimp-text-dim);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.statusbar-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gimp-text);
+}

@@ -1,0 +1,245 @@
+<div class="editor-shell"
+     data-controller="editor"
+     data-editor-image-url-value="<%= url_for(@edit_session.display_image) %>"
+     data-editor-mask-url-value="<%= @edit_session.current_mask.attached? ? url_for(@edit_session.current_mask) : "" %>"
+     data-editor-fuzzy-select-url-value="<%= edit_session_fuzzy_select_path(@edit_session) %>"
+     data-editor-gradient-select-url-value="<%= edit_session_gradient_select_path(@edit_session) %>"
+     data-editor-select-by-color-url-value="<%= edit_session_select_by_color_path(@edit_session) %>"
+     data-editor-gradient-select-from-selection-url-value="<%= edit_session_gradient_select_from_selection_path(@edit_session) %>"
+     data-editor-select-all-url-value="<%= edit_session_select_all_path(@edit_session) %>"
+     data-editor-deselect-all-url-value="<%= edit_session_deselect_all_path(@edit_session) %>"
+     data-editor-free-select-url-value="<%= edit_session_free_select_path(@edit_session) %>"
+     data-editor-line-select-url-value="<%= edit_session_line_select_path(@edit_session) %>"
+     data-editor-brush-select-url-value="<%= edit_session_brush_select_path(@edit_session) %>"
+     data-editor-split-selection-url-value="<%= edit_session_split_selection_path(@edit_session) %>"
+     data-editor-invert-url-value="<%= edit_session_invert_path(@edit_session) %>"
+     data-editor-remove-holes-url-value="<%= edit_session_remove_holes_path(@edit_session) %>"
+     data-editor-grow-selection-url-value="<%= edit_session_grow_selection_path(@edit_session) %>"
+     data-editor-select-border-url-value="<%= edit_session_select_border_path(@edit_session) %>"
+     data-editor-delete-url-value="<%= edit_session_delete_path(@edit_session) %>"
+     data-editor-undo-url-value="<%= edit_session_undo_path(@edit_session) %>"
+     data-editor-redo-url-value="<%= edit_session_redo_path(@edit_session) %>"
+     data-editor-save-selection-url-value="<%= edit_session_save_selection_path(@edit_session) %>"
+     data-editor-saved-selections-url-value="<%= edit_session_saved_selections_path(@edit_session) %>"
+     data-editor-merge-selection-url-value="<%= edit_session_merge_selection_path(@edit_session) %>"
+     data-editor-export-url-value="<%= export_edit_session_path(@edit_session) %>">
+
+  <div class="editor-sidebar">
+    <div class="editor-toolbox" data-editor-target="toolbar">
+      <button type="button" class="tool-button active" data-tool="fuzzy_select"
+              data-action="editor#selectTool" title="Fuzzy Select (U)">
+        <i class="bi bi-magic"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="free_select"
+              data-action="editor#selectTool" title="Free Select (F) — click to place points, click the first point to close">
+        <i class="bi bi-vector-pen"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="gradient_select"
+              data-action="editor#selectTool" title="Gradient Select (G) — like Fuzzy Select, but tolerance compares against the adjacent selected pixel, not the clicked pixel">
+        <i class="bi bi-droplet-half"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="select_by_color"
+              data-action="editor#selectTool" title="Select by Color (O) — selects every matching pixel in the image, not just connected ones; useful for distributed objects like stray hairs">
+        <i class="bi bi-palette"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="line_select"
+              data-action="editor#selectTool" title="Line Select (L) — click two points to select a line between them">
+        <i class="bi bi-slash-lg"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="brush"
+              data-action="editor#selectTool" title="Brush (B) — draw to select, then Add/Remove/New from the tool options">
+        <i class="bi bi-brush"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="split_selection"
+              data-action="editor#selectTool" title="Split Selection (S) — requires an existing selection; click two points to set a splitting line's direction, then click the side to keep">
+        <i class="bi bi-scissors"></i>
+      </button>
+
+      <div class="tool-divider"></div>
+
+      <button type="button" class="tool-button" data-tool="zoom"
+              data-action="editor#selectTool" title="Zoom (click: in, Ctrl/Cmd+click: out)">
+        <i class="bi bi-zoom-in"></i>
+      </button>
+    </div>
+
+    <div class="editor-tool-options" data-editor-target="toolOptions">
+      <div class="tool-options-header">Tool Options</div>
+
+      <div class="tool-option-row" data-editor-target="toleranceControl">
+        <label for="tolerance-input">Threshold</label>
+        <div class="stepper-field">
+          <input type="number" min="0" max="128" step="0.1" id="tolerance-input"
+                 class="stepper-input" data-editor-target="toleranceInput"
+                 data-action="change->editor#toleranceInputChanged">
+          <div class="stepper-buttons">
+            <button type="button" class="stepper-button" data-action="editor#toleranceStepUp" title="Increase">
+              <i class="bi bi-caret-up-fill"></i>
+            </button>
+            <button type="button" class="stepper-button" data-action="editor#toleranceStepDown" title="Decrease">
+              <i class="bi bi-caret-down-fill"></i>
+            </button>
+          </div>
+        </div>
+        <input type="range" min="0" max="128" step="0.1" id="tolerance-slider"
+               class="tool-option-slider" data-editor-target="toleranceSlider"
+               data-action="input->editor#toleranceSliderChanged">
+      </div>
+
+      <div class="tool-option-row" data-editor-target="brushSizeControl">
+        <label for="brush-size-input">Brush Size</label>
+        <div class="stepper-field">
+          <input type="number" min="1" max="200" step="1" id="brush-size-input"
+                 class="stepper-input" data-editor-target="brushSizeInput"
+                 data-action="change->editor#brushSizeInputChanged">
+          <div class="stepper-buttons">
+            <button type="button" class="stepper-button" data-action="editor#brushSizeStepUp" title="Increase">
+              <i class="bi bi-caret-up-fill"></i>
+            </button>
+            <button type="button" class="stepper-button" data-action="editor#brushSizeStepDown" title="Decrease">
+              <i class="bi bi-caret-down-fill"></i>
+            </button>
+          </div>
+        </div>
+        <input type="range" min="1" max="200" step="1" id="brush-size-slider"
+               class="tool-option-slider" data-editor-target="brushSizeSlider"
+               data-action="input->editor#brushSizeSliderChanged">
+      </div>
+
+      <div class="tool-option-row brush-submit-row" data-editor-target="brushSubmitControl">
+        <label>Brush Selection</label>
+        <div class="brush-submit-button-list">
+          <button type="button" class="brush-submit-button" data-action="editor#submitBrushAdd"
+                  title="Add brush strokes to current selection">
+            <i class="bi bi-plus-lg"></i> Add
+          </button>
+          <button type="button" class="brush-submit-button" data-action="editor#submitBrushRemove"
+                  title="Remove brush strokes from current selection">
+            <i class="bi bi-dash-lg"></i> Remove
+          </button>
+          <button type="button" class="brush-submit-button" data-action="editor#submitBrushNew"
+                  title="Replace current selection with brush strokes">
+            <i class="bi bi-plus-square"></i> New
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-functions">
+      <div class="tool-options-header">Functions</div>
+
+      <div class="function-button-list">
+        <button type="button" class="function-button" data-action="editor#selectAll" title="Select All (Ctrl/Cmd+A)">
+          <i class="bi bi-bounding-box"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#deselectAll" title="Deselect All (Ctrl/Cmd+D)">
+          <i class="bi bi-x-square"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#invert" title="Invert Selection (Ctrl/Cmd+I)">
+          <i class="bi bi-arrow-left-right"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#removeHoles" title="Remove Holes">
+          <i class="bi bi-eraser"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#openGrowSelectionDialog" title="Grow Selection">
+          <i class="bi bi-arrows-angle-expand"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#gradientSelectFromSelection" title="Gradient Select from Selection — extend the selection outward from its boundary using the current Threshold, until a hard edge">
+          <i class="bi bi-droplet"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#openSelectBorderDialog" title="Select Border">
+          <i class="bi bi-square"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#clearSelection" title="Clear Selection (Delete/Backspace)">
+          <i class="bi bi-trash"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#saveSelection" title="Save Selection (up to 3, oldest rolls off)">
+          <i class="bi bi-bookmark-plus"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#openMergeSelectionDialog" title="Merge Saved Selection">
+          <i class="bi bi-bookmarks"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#undo" title="Undo (Ctrl/Cmd+Z)">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#redo" title="Redo (Ctrl/Cmd+Shift+Z)">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+        <button type="button" class="function-button" data-action="editor#download" title="Download PNG">
+          <i class="bi bi-download"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor-main" data-editor-target="editorMain">
+    <div class="canvas-stack" data-editor-target="canvasStack">
+      <canvas data-editor-target="imageCanvas"></canvas>
+      <canvas data-editor-target="brushCanvas"></canvas>
+      <canvas data-editor-target="overlayCanvas"
+              data-action="click->editor#click"></canvas>
+    </div>
+  </div>
+
+  <dialog class="border-size-dialog" data-editor-target="borderSizeDialog">
+    <div class="dialog-header">
+      <h2 data-editor-target="borderSizeDialogTitle">Border Size</h2>
+      <button type="button" class="dialog-close-button" data-action="editor#closeBorderSizeDialog">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <div class="tool-option-row">
+        <label for="border-size-input">Border Size (px)</label>
+        <div class="stepper-field">
+          <input type="number" min="1" max="500" step="1" id="border-size-input"
+                 class="stepper-input" data-editor-target="borderSizeInput"
+                 data-action="change->editor#borderSizeInputChanged">
+          <div class="stepper-buttons">
+            <button type="button" class="stepper-button" data-action="editor#borderSizeStepUp" title="Increase">
+              <i class="bi bi-caret-up-fill"></i>
+            </button>
+            <button type="button" class="stepper-button" data-action="editor#borderSizeStepDown" title="Decrease">
+              <i class="bi bi-caret-down-fill"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-button" data-action="editor#closeBorderSizeDialog">Cancel</button>
+        <button type="button" class="dialog-button dialog-button-primary" data-action="editor#confirmBorderSizeDialog">Apply</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="merge-selection-dialog" data-editor-target="mergeSelectionDialog">
+    <div class="dialog-header">
+      <h2>Merge Saved Selection</h2>
+      <button type="button" class="dialog-close-button" data-action="editor#closeMergeSelectionDialog">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <ul class="saved-selection-list" data-editor-target="savedSelectionList"></ul>
+    </div>
+  </dialog>
+
+  <div class="editor-statusbar">
+    <button type="button" class="statusbar-button" data-action="global-actions#openFileDialog" title="Upload New (Ctrl/Cmd+Shift+O)">
+      <i class="bi bi-upload"></i>
+    </button>
+    <button type="button" class="statusbar-button" data-action="global-actions#openLoadDialog" title="Load Session (Ctrl/Cmd+O)">
+      <i class="bi bi-folder2-open"></i>
+    </button>
+    <span data-editor-target="status"></span>
+    <span class="spacer"></span>
+    <span class="zoom-level" data-editor-target="zoomLevel"></span>
+    <span class="hint">U: Fuzzy Select (Ctrl/Cmd+Click: Add to selection) &middot; F: Free Select (click first point to close, Ctrl/Cmd+Click: Add to selection) &middot; G: Gradient Select (Ctrl/Cmd+Click: Add to selection) &middot; O: Select by Color (selects every matching pixel in the image, Ctrl/Cmd+Click: Add to selection) &middot; L: Line Select (click two points, Ctrl/Cmd+Click on second: Add to selection) &middot; B: Brush (draw freehand, then Add/Remove/New Selection in the tool options) &middot; S: Split Selection (requires a selection; click two points to set the split line's direction, then click the side to keep) &middot; Zoom tool: Click in, Ctrl/Cmd+Click out &middot; Ctrl/Cmd+A: Select All &middot; Ctrl/Cmd+D: Deselect &middot; Ctrl/Cmd+I: Invert &middot; Remove Holes: sidebar button &middot; Grow Selection / Select Border: sidebar buttons &middot; Gradient Select from Selection: sidebar button (uses Threshold, extends outward from selection boundary) &middot; Delete/Backspace: Clear selection &middot; Ctrl/Cmd+Z: Undo &middot; Ctrl/Cmd+Shift+Z: Redo &middot; +/-: Zoom &middot; 0: Reset Zoom &middot; Ctrl/Cmd+Shift+O: Upload New &middot; Ctrl/Cmd+O: Load Session</span>
+  </div>
+</div>

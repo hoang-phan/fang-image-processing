@@ -1,0 +1,17 @@
+<% if edit_sessions.empty? %>
+  <p class="session-list-empty">No saved sessions yet.</p>
+<% else %>
+  <ul class="session-list">
+    <% edit_sessions.each do |edit_session| %>
+      <li class="session-list-item">
+        <a href="<%= edit_session_path(edit_session) %>" class="session-list-link">
+          <%= image_tag edit_session.display_image.variant(resize_to_limit: [96, 96]), class: "session-thumb" %>
+          <span class="session-date"><%= edit_session.created_at.strftime("%b %-d, %Y %-l:%M %p") %></span>
+        </a>
+        <button type="button" class="session-delete-button" data-id="<%= edit_session.id %>" title="Delete session">
+          <i class="bi bi-trash"></i>
+        </button>
+      </li>
+    <% end %>
+  </ul>
+<% end %>
