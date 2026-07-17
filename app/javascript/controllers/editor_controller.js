@@ -59,6 +59,7 @@ export default class extends Controller {
     brushSelectUrl: String,
     rectSelectUrl: String,
     splitSelectionUrl: String,
+    smoothAutoFillUrl: String,
     invertUrl: String,
     removeHolesUrl: String,
     growSelectionUrl: String,
@@ -80,6 +81,7 @@ export default class extends Controller {
     this.lineSelectStart = null
     this.rectSelectStart = null
     this.splitSelectionLine = null
+    this.smoothAutoFillStart = null
     this.brushStrokes = []
     this.brushDrawing = false
     this.brushPointer = null
@@ -180,6 +182,12 @@ export default class extends Controller {
 
     if (this.splitSelectionLine) {
       this.splitSelectionPointer = this.eventToImageCoordinates(event)
+      this.renderOverlay()
+      return
+    }
+
+    if (this.smoothAutoFillStart) {
+      this.smoothAutoFillPointer = this.eventToImageCoordinates(event)
       this.renderOverlay()
     }
   }
@@ -317,6 +325,12 @@ export default class extends Controller {
       return
     }
 
+    if (!meta && event.key.toLowerCase() === "a") {
+      event.preventDefault()
+      this.selectTool({ currentTarget: this.toolbarTarget.querySelector('[data-tool="smooth_auto_fill"]') })
+      return
+    }
+
     if (!meta && (event.key === "+" || event.key === "=")) {
       event.preventDefault()
       this.zoomIn()
@@ -341,6 +355,7 @@ export default class extends Controller {
       this.cancelLineSelect()
       this.cancelRectSelect()
       this.cancelSplitSelection()
+      this.cancelSmoothAutoFill()
       this.cancelBrush()
       return
     }
@@ -368,6 +383,9 @@ export default class extends Controller {
     }
     if (this.tool === "split_selection" && button.dataset.tool !== "split_selection") {
       this.cancelSplitSelection()
+    }
+    if (this.tool === "smooth_auto_fill" && button.dataset.tool !== "smooth_auto_fill") {
+      this.cancelSmoothAutoFill()
     }
     if (this.tool === "brush" && button.dataset.tool !== "brush") {
       this.cancelBrush()
@@ -486,6 +504,17 @@ export default class extends Controller {
     if (!this.splitSelectionLine) return
     this.splitSelectionLine = null
     this.splitSelectionPointer = null
+    this.renderOverlay()
+    this.setStatus("")
+  }
+
+  // Escape, or switching tools mid-vector, abandons an in-progress Smooth
+  // Auto Fill vector pick (a placed first point with no second point yet)
+  // without submitting anything — same convention as cancelLineSelect().
+  cancelSmoothAutoFill() {
+    if (!this.smoothAutoFillStart) return
+    this.smoothAutoFillStart = null
+    this.smoothAutoFillPointer = null
     this.renderOverlay()
     this.setStatus("")
   }
@@ -691,6 +720,11 @@ export default class extends Controller {
       return
     }
 
+    if (this.tool === "smooth_auto_fill") {
+      await this.smoothAutoFillClick(x, y)
+      return
+    }
+
     const addToSelection = event.metaKey || event.ctrlKey
     const subtractFromSelection = event.shiftKey
 
@@ -862,6 +896,46 @@ export default class extends Controller {
 
     const { mask_url } = await response.json()
     this.drawMask(mask_url)
+    this.setStatus("")
+  }
+
+  // Smooth Auto Fill: only usable with an existing selection (like Split
+  // Selection — there's no selection to limit the fill to otherwise). Click
+  // one point, then a second point — those two set a direction vector, not a
+  // segment endpoint pair (same "direction/position only" convention as
+  // Split Selection's line, not Line Select's stroke endpoints). The second
+  // click submits immediately; no add/subtract modifier, since this doesn't
+  // change what's selected, only the pixel colors within it.
+  async smoothAutoFillClick(x, y) {
+    if (!this.selectionPath) return
+
+    if (!this.smoothAutoFillStart) {
+      this.smoothAutoFillStart = { x, y }
+      this.renderOverlay()
+      return
+    }
+
+    await this.submitSmoothAutoFill(x, y)
+  }
+
+  async submitSmoothAutoFill(x, y) {
+    const start = this.smoothAutoFillStart
+    this.smoothAutoFillStart = null
+    this.smoothAutoFillPointer = null
+
+    this.setStatus("Working…")
+
+    const response = await this.post(this.smoothAutoFillUrlValue, {
+      x1: start.x, y1: start.y, x2: x, y2: y,
+    })
+    if (!response.ok) {
+      this.setStatus("Operation failed.")
+      this.renderOverlay()
+      return
+    }
+
+    const { final_image_url } = await response.json()
+    await this.redrawCanvas(final_image_url)
     this.setStatus("")
   }
 
@@ -1347,6 +1421,8 @@ export default class extends Controller {
     this.lineSelectPointer = null
     this.rectSelectStart = null
     this.rectSelectPointer = null
+    this.smoothAutoFillStart = null
+    this.smoothAutoFillPointer = null
     this.cancelBrush()
     this.setStatus("Working…")
 
@@ -1493,6 +1569,10 @@ export default class extends Controller {
     if (this.splitSelectionLine) {
       this.renderSplitSelectionPreview(context)
     }
+
+    if (this.smoothAutoFillStart) {
+      this.renderSmoothAutoFillPreview(context)
+    }
   }
 
   // Draws the in-progress line select: a plain (non-marching) line from the
@@ -1545,6 +1625,29 @@ export default class extends Controller {
     context.fillStyle = "#3388ff"
     context.beginPath()
     context.arc(this.rectSelectStart.x, this.rectSelectStart.y, 3, 0, Math.PI * 2)
+    context.fill()
+  }
+
+  // Draws the in-progress Smooth Auto Fill vector pick: a plain line from
+  // the placed first point to the current pointer position, same visual
+  // language as renderLineSelectPreview() but at a fixed 1px width — unlike
+  // Line Select's stroke, this line only conveys direction, not an area that
+  // will be selected, so there's no Brush-Size-width preview to show.
+  renderSmoothAutoFillPreview(context) {
+    const end = this.smoothAutoFillPointer || this.smoothAutoFillStart
+
+    context.setLineDash([])
+    context.lineWidth = 1.5
+    context.strokeStyle = "rgba(51, 136, 255, 0.8)"
+
+    context.beginPath()
+    context.moveTo(this.smoothAutoFillStart.x, this.smoothAutoFillStart.y)
+    context.lineTo(end.x, end.y)
+    context.stroke()
+
+    context.fillStyle = "#3388ff"
+    context.beginPath()
+    context.arc(this.smoothAutoFillStart.x, this.smoothAutoFillStart.y, 3, 0, Math.PI * 2)
     context.fill()
   }
 

@@ -379,6 +379,99 @@ def invert(mask):
     return cv2.bitwise_not(mask)
 
 
+def smooth_auto_fill(rgb, alpha, mask, x1, y1, x2, y2):
+    """Smooth Auto Fill: given a direction vector from (x1, y1) to (x2, y2),
+    sweeps a family of 1px-spaced parallel lines across the whole image. For
+    each line, walks in from both ends to find the closest non-transparent
+    pixel on either side, then linearly interpolates color between those two
+    anchors along the line. A line with no non-transparent anchor on one or
+    both ends is left untouched entirely (there's nothing to interpolate
+    between). The anchor pixels themselves are looked up from the full image
+    (`alpha`/`rgb`), not restricted to the selection — only the *write* is
+    restricted, to selected-and-transparent pixels (`mask` AND `alpha == 0`),
+    per the tool's spec: colors are sourced from wherever the nearest opaque
+    pixel is, but the fill never touches anything outside the selection or
+    overwrites already-opaque pixels.
+
+    Pixels are grouped into lines by rounding their perpendicular distance
+    from the origin line through (x1, y1) to the nearest integer, which tiles
+    the image into 1px-wide bands parallel to the direction vector — the
+    same "which line does this pixel belong to" question as
+    split_selection's side test, just bucketed by distance instead of sign.
+    Within a line, pixels are ordered by their projection onto the direction
+    vector so "walk in from both ends" and "interpolate along the line" are
+    well-defined.
+
+    Returns a single RGBA array (like apply_mask_as_alpha), not a bare mask —
+    this tool writes actual pixel colors, not a selection.
+    """
+    height, width = mask.shape[:2]
+    dx, dy = float(x2 - x1), float(y2 - y1)
+    length = np.hypot(dx, dy)
+    if length == 0:
+        return np.dstack([rgb, alpha])
+
+    ux, uy = dx / length, dy / length
+
+    ys, xs = np.mgrid[0:height, 0:width]
+    rel_x = (xs - x1).astype(np.float64)
+    rel_y = (ys - y1).astype(np.float64)
+
+    # Projection along the direction vector (position within its line) and
+    # perpendicular offset (which line a pixel belongs to), via the unit
+    # direction and its normal (-uy, ux).
+    along = rel_x * ux + rel_y * uy
+    across = np.rint(rel_x * -uy + rel_y * ux).astype(np.int64)
+
+    selected = mask > 0
+    transparent = alpha == 0
+    fillable = selected & transparent
+    opaque = ~transparent
+
+    out_rgb = rgb.copy()
+    out_alpha = alpha.copy()
+
+    line_ids = across.ravel()
+    order = np.argsort(line_ids, kind="stable")
+    sorted_ids = line_ids[order]
+    boundaries = np.flatnonzero(np.diff(sorted_ids)) + 1
+    groups = np.split(order, boundaries)
+
+    flat_along = along.ravel()
+    flat_opaque = opaque.ravel()
+    flat_fillable = fillable.ravel()
+    flat_rgb = rgb.reshape(-1, rgb.shape[-1])
+
+    for group in groups:
+        line_order = group[np.argsort(flat_along[group], kind="stable")]
+        opaque_positions = np.flatnonzero(flat_opaque[line_order])
+        if opaque_positions.size == 0:
+            continue
+
+        first_idx = line_order[opaque_positions[0]]
+        last_idx = line_order[opaque_positions[-1]]
+        if first_idx == last_idx:
+            continue
+
+        start_t, end_t = flat_along[first_idx], flat_along[last_idx]
+        start_color = flat_rgb[first_idx].astype(np.float64)
+        end_color = flat_rgb[last_idx].astype(np.float64)
+
+        to_fill = line_order[flat_fillable[line_order]]
+        to_fill = to_fill[(flat_along[to_fill] > start_t) & (flat_along[to_fill] < end_t)]
+        if to_fill.size == 0:
+            continue
+
+        weight = (flat_along[to_fill] - start_t) / (end_t - start_t)
+        colors = start_color[None, :] + weight[:, None] * (end_color - start_color)[None, :]
+
+        fill_ys, fill_xs = np.unravel_index(to_fill, (height, width))
+        out_rgb[fill_ys, fill_xs] = np.rint(colors).astype(np.uint8)
+        out_alpha[fill_ys, fill_xs] = 255
+
+    return np.dstack([out_rgb, out_alpha])
+
+
 def apply_mask_as_alpha(rgb, existing_alpha, mask):
     """Composites `mask` (selected -> transparent) onto whatever alpha the
     image already had, so previously-cleared pixels stay cleared. AND rather

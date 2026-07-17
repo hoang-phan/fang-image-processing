@@ -13,6 +13,7 @@
      data-editor-brush-select-url-value="<%= edit_session_brush_select_path(@edit_session) %>"
      data-editor-rect-select-url-value="<%= edit_session_rect_select_path(@edit_session) %>"
      data-editor-split-selection-url-value="<%= edit_session_split_selection_path(@edit_session) %>"
+     data-editor-smooth-auto-fill-url-value="<%= edit_session_smooth_auto_fill_path(@edit_session) %>"
      data-editor-invert-url-value="<%= edit_session_invert_path(@edit_session) %>"
      data-editor-remove-holes-url-value="<%= edit_session_remove_holes_path(@edit_session) %>"
      data-editor-grow-selection-url-value="<%= edit_session_grow_selection_path(@edit_session) %>"
@@ -65,6 +66,11 @@
       <button type="button" class="tool-button" data-tool="split_selection"
               data-action="editor#selectTool" title="Split Selection (S) — requires an existing selection; click two points to set a splitting line's direction, then click the side to keep">
         <i class="bi bi-scissors"></i>
+      </button>
+
+      <button type="button" class="tool-button" data-tool="smooth_auto_fill"
+              data-action="editor#selectTool" title="Smooth Auto Fill (A) — requires an existing selection; click two points to set a direction, then smoothly fills transparent pixels along parallel lines between the nearest opaque pixels on each end">
+        <i class="bi bi-rainbow"></i>
       </button>
 
       <div class="tool-divider"></div>
@@ -246,6 +252,6 @@
     <span data-editor-target="status"></span>
     <span class="spacer"></span>
     <span class="zoom-level" data-editor-target="zoomLevel"></span>
-    <span class="hint">U: Fuzzy Select (Ctrl/Cmd+Click: Add to selection) &middot; F: Free Select (click first point to close, Ctrl/Cmd+Click: Add to selection) &middot; G: Gradient Select (Ctrl/Cmd+Click: Add to selection) &middot; O: Select by Color (selects every matching pixel in the image, Ctrl/Cmd+Click: Add to selection) &middot; L: Line Select (click two points, Ctrl/Cmd+Click on second: Add to selection) &middot; R: Rectangle Select (click two opposite corners, Ctrl/Cmd+Click on second: Add to selection) &middot; B: Brush (draw freehand, then Add/Remove/New Selection in the tool options) &middot; S: Split Selection (requires a selection; click two points to set the split line's direction, then click the side to keep) &middot; Zoom tool: Click in, Ctrl/Cmd+Click out &middot; Ctrl/Cmd+A: Select All &middot; Ctrl/Cmd+D: Deselect &middot; Ctrl/Cmd+I: Invert &middot; Remove Holes: sidebar button &middot; Grow Selection / Select Border: sidebar buttons &middot; Gradient Select from Selection: sidebar button (uses Threshold, extends outward from selection boundary) &middot; Delete/Backspace: Clear selection &middot; Ctrl/Cmd+Z: Undo &middot; Ctrl/Cmd+Shift+Z: Redo &middot; +/-: Zoom &middot; 0: Reset Zoom &middot; Ctrl/Cmd+Shift+O: Upload New &middot; Ctrl/Cmd+O: Load Session</span>
+    <span class="hint">U: Fuzzy Select (Ctrl/Cmd+Click: Add to selection) &middot; F: Free Select (click first point to close, Ctrl/Cmd+Click: Add to selection) &middot; G: Gradient Select (Ctrl/Cmd+Click: Add to selection) &middot; O: Select by Color (selects every matching pixel in the image, Ctrl/Cmd+Click: Add to selection) &middot; L: Line Select (click two points, Ctrl/Cmd+Click on second: Add to selection) &middot; R: Rectangle Select (click two opposite corners, Ctrl/Cmd+Click on second: Add to selection) &middot; B: Brush (draw freehand, then Add/Remove/New Selection in the tool options) &middot; S: Split Selection (requires a selection; click two points to set the split line's direction, then click the side to keep) &middot; A: Smooth Auto Fill (requires a selection; click two points to set a fill direction, smoothly blends transparent pixels along parallel lines between the nearest opaque colors on each end) &middot; Zoom tool: Click in, Ctrl/Cmd+Click out &middot; Ctrl/Cmd+A: Select All &middot; Ctrl/Cmd+D: Deselect &middot; Ctrl/Cmd+I: Invert &middot; Remove Holes: sidebar button &middot; Grow Selection / Select Border: sidebar buttons &middot; Gradient Select from Selection: sidebar button (uses Threshold, extends outward from selection boundary) &middot; Delete/Backspace: Clear selection &middot; Ctrl/Cmd+Z: Undo &middot; Ctrl/Cmd+Shift+Z: Redo &middot; +/-: Zoom &middot; 0: Reset Zoom &middot; Ctrl/Cmd+Shift+O: Upload New &middot; Ctrl/Cmd+O: Load Session</span>
   </div>
 </div>

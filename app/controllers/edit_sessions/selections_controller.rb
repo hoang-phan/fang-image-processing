@@ -277,6 +277,38 @@ module EditSessions
       render json: { final_image_url: url_for(@edit_session.canvas_image) }
     end
 
+    # Smooth Auto Fill: the browser sends two points defining a direction
+    # vector. Sweeps 1px-spaced lines parallel to that vector across the
+    # selection, and for each one, linearly interpolates color between the
+    # closest non-transparent pixels on either end (searched across the whole
+    # image, not just the selection) into the transparent, selected pixels
+    # between them — see masks.smooth_auto_fill. Like delete, this writes
+    # actual pixel colors rather than producing a mask, so it composites onto
+    # display_image and records a new canvas snapshot the same way delete
+    # does; the mask itself is unchanged (carried forward implicitly, same as
+    # delete's mask_bytes). Requires a selection, same guard as invert/delete —
+    # there's nothing to limit the fill to otherwise.
+    def smooth_auto_fill
+      return render_no_selection unless @edit_session.current_mask.attached?
+
+      composited_png = pixel_engine.smooth_auto_fill(
+        image: @edit_session.display_image.download,
+        mask: @edit_session.current_mask.download,
+        x1: params.require(:x1).to_i,
+        y1: params.require(:y1).to_i,
+        x2: params.require(:x2).to_i,
+        y2: params.require(:y2).to_i
+      )
+
+      @edit_session.record_snapshot!(
+        operation: "smooth_auto_fill",
+        mask_bytes: @edit_session.current_mask.download,
+        canvas_bytes: composited_png
+      )
+
+      render json: { final_image_url: url_for(@edit_session.canvas_image) }
+    end
+
     def undo
       return render_no_history("Nothing to undo.") unless @edit_session.undo!
 

@@ -111,6 +111,15 @@ class RectSelectRequest(BaseModel):
     y2: int
 
 
+class SmoothAutoFillRequest(BaseModel):
+    image: str
+    mask: str
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+
+
 @app.post("/fuzzy_select")
 def fuzzy_select(req: FuzzySelectRequest):
     image = masks.decode_image(b64_to_bytes(req.image))
@@ -238,3 +247,11 @@ def rect_select(req: RectSelectRequest):
     image = masks.decode_image(b64_to_bytes(req.image))
     result = masks.rect_select(image, req.x1, req.y1, req.x2, req.y2)
     return {"mask": bytes_to_b64(masks.encode_mask(result))}
+
+
+@app.post("/smooth_auto_fill")
+def smooth_auto_fill(req: SmoothAutoFillRequest):
+    rgb, alpha = masks.decode_image_with_alpha(b64_to_bytes(req.image))
+    mask = masks.decode_mask(b64_to_bytes(req.mask))
+    result = masks.smooth_auto_fill(rgb, alpha, mask, req.x1, req.y1, req.x2, req.y2)
+    return {"png": bytes_to_b64(masks.encode_png(result))}

@@ -20,6 +20,7 @@ Rails.application.routes.draw do
       post :brush_select, to: "selections#brush_select"
       post :rect_select, to: "selections#rect_select"
       post :split_selection, to: "selections#split_selection"
+      post :smooth_auto_fill, to: "selections#smooth_auto_fill"
       post :invert, to: "selections#invert"
       post :remove_holes, to: "selections#remove_holes"
       post :grow_selection, to: "selections#grow_selection"

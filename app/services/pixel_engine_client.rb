@@ -93,6 +93,11 @@ class PixelEngineClient
     decode(post("/rect_select", body).fetch("mask"))
   end
 
+  def smooth_auto_fill(image:, mask:, x1:, y1:, x2:, y2:)
+    body = { image: encode(image), mask: encode(mask), x1: x1, y1: y1, x2: x2, y2: y2 }
+    decode(post("/smooth_auto_fill", body).fetch("png"))
+  end
+
   private
 
   def post(path, body)
