@@ -139,6 +139,23 @@ module EditSessions
       render_mask
     end
 
+    # Rectangle select: the browser sends two opposite corner points — like
+    # line_select, there's no closing gesture, so each pair of clicks submits
+    # immediately. Same mask_with_modifier add/subtract shape as every other
+    # select tool.
+    def rect_select
+      region_mask = pixel_engine.rect_select(
+        image: @edit_session.display_image.download,
+        x1: params.require(:x1).to_i,
+        y1: params.require(:y1).to_i,
+        x2: params.require(:x2).to_i,
+        y2: params.require(:y2).to_i
+      )
+
+      @edit_session.record_snapshot!(operation: "rect_select", mask_bytes: mask_with_modifier(region_mask))
+      render_mask
+    end
+
     # Brush select: the browser paints one or more freehand strokes entirely
     # client-side (see editor_controller.js) and only submits here once the
     # user picks one of the three submission buttons — add/subtract/new

@@ -87,6 +87,20 @@ def line_select(image_bgr, x1, y1, x2, y2, brush_size):
     return mask
 
 
+def rect_select(image_bgr, x1, y1, x2, y2):
+    """Selects every pixel in the axis-aligned rectangle between (x1, y1) and
+    (x2, y2) — the two clicked points are opposite corners, not a stroke's
+    endpoints the way line_select's are, so this fills the enclosed area
+    rather than stroking a path. cv2.rectangle's thickness=-1 fills the box
+    directly; no min/max normalization of the corners is needed since
+    rectangle interprets any two opposite corners the same way.
+    """
+    height, width = image_bgr.shape[:2]
+    mask = np.zeros((height, width), dtype=np.uint8)
+    cv2.rectangle(mask, (x1, y1), (x2, y2), color=255, thickness=-1)
+    return mask
+
+
 def brush_select(image_bgr, strokes, brush_size):
     """Strokes freehand brush paths (GIMP foreground-select style) into a
     selection mask. `strokes` is a list of point lists — one per continuous

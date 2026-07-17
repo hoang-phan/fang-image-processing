@@ -103,6 +103,14 @@ class BrushSelectRequest(BaseModel):
     brush_size: int = 1
 
 
+class RectSelectRequest(BaseModel):
+    image: str
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+
+
 @app.post("/fuzzy_select")
 def fuzzy_select(req: FuzzySelectRequest):
     image = masks.decode_image(b64_to_bytes(req.image))
@@ -222,4 +230,11 @@ def line_select(req: LineSelectRequest):
 def brush_select(req: BrushSelectRequest):
     image = masks.decode_image(b64_to_bytes(req.image))
     result = masks.brush_select(image, req.strokes, req.brush_size)
+    return {"mask": bytes_to_b64(masks.encode_mask(result))}
+
+
+@app.post("/rect_select")
+def rect_select(req: RectSelectRequest):
+    image = masks.decode_image(b64_to_bytes(req.image))
+    result = masks.rect_select(image, req.x1, req.y1, req.x2, req.y2)
     return {"mask": bytes_to_b64(masks.encode_mask(result))}

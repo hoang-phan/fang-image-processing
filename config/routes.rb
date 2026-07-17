@@ -18,6 +18,7 @@ Rails.application.routes.draw do
       post :free_select, to: "selections#free_select"
       post :line_select, to: "selections#line_select"
       post :brush_select, to: "selections#brush_select"
+      post :rect_select, to: "selections#rect_select"
       post :split_selection, to: "selections#split_selection"
       post :invert, to: "selections#invert"
       post :remove_holes, to: "selections#remove_holes"

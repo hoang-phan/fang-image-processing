@@ -88,6 +88,11 @@ class PixelEngineClient
     decode(post("/brush_select", body).fetch("mask"))
   end
 
+  def rect_select(image:, x1:, y1:, x2:, y2:)
+    body = { image: encode(image), x1: x1, y1: y1, x2: x2, y2: y2 }
+    decode(post("/rect_select", body).fetch("mask"))
+  end
+
   private
 
   def post(path, body)

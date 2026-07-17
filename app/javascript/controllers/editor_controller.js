@@ -57,6 +57,7 @@ export default class extends Controller {
     freeSelectUrl: String,
     lineSelectUrl: String,
     brushSelectUrl: String,
+    rectSelectUrl: String,
     splitSelectionUrl: String,
     invertUrl: String,
     removeHolesUrl: String,
@@ -77,6 +78,7 @@ export default class extends Controller {
     this.marchOffset = 0
     this.freeSelectPoints = []
     this.lineSelectStart = null
+    this.rectSelectStart = null
     this.splitSelectionLine = null
     this.brushStrokes = []
     this.brushDrawing = false
@@ -166,6 +168,12 @@ export default class extends Controller {
 
     if (this.lineSelectStart) {
       this.lineSelectPointer = this.eventToImageCoordinates(event)
+      this.renderOverlay()
+      return
+    }
+
+    if (this.rectSelectStart) {
+      this.rectSelectPointer = this.eventToImageCoordinates(event)
       this.renderOverlay()
       return
     }
@@ -291,6 +299,12 @@ export default class extends Controller {
       return
     }
 
+    if (!meta && event.key.toLowerCase() === "r") {
+      event.preventDefault()
+      this.selectTool({ currentTarget: this.toolbarTarget.querySelector('[data-tool="rect_select"]') })
+      return
+    }
+
     if (!meta && event.key.toLowerCase() === "b") {
       event.preventDefault()
       this.selectTool({ currentTarget: this.toolbarTarget.querySelector('[data-tool="brush"]') })
@@ -325,6 +339,7 @@ export default class extends Controller {
       event.preventDefault()
       this.cancelFreeSelect()
       this.cancelLineSelect()
+      this.cancelRectSelect()
       this.cancelSplitSelection()
       this.cancelBrush()
       return
@@ -347,6 +362,9 @@ export default class extends Controller {
     }
     if (this.tool === "line_select" && button.dataset.tool !== "line_select") {
       this.cancelLineSelect()
+    }
+    if (this.tool === "rect_select" && button.dataset.tool !== "rect_select") {
+      this.cancelRectSelect()
     }
     if (this.tool === "split_selection" && button.dataset.tool !== "split_selection") {
       this.cancelSplitSelection()
@@ -445,6 +463,17 @@ export default class extends Controller {
     if (!this.lineSelectStart) return
     this.lineSelectStart = null
     this.lineSelectPointer = null
+    this.renderOverlay()
+    this.setStatus("")
+  }
+
+  // Escape, or switching tools mid-rectangle, abandons an in-progress rect
+  // select (a placed first corner with no second corner yet) without
+  // submitting anything — same convention as cancelLineSelect().
+  cancelRectSelect() {
+    if (!this.rectSelectStart) return
+    this.rectSelectStart = null
+    this.rectSelectPointer = null
     this.renderOverlay()
     this.setStatus("")
   }
@@ -652,6 +681,11 @@ export default class extends Controller {
       return
     }
 
+    if (this.tool === "rect_select") {
+      await this.rectSelectClick(x, y, event)
+      return
+    }
+
     if (this.tool === "split_selection") {
       await this.splitSelectionClick(x, y)
       return
@@ -779,6 +813,45 @@ export default class extends Controller {
     const response = await this.post(this.lineSelectUrlValue, {
       x1: start.x, y1: start.y, x2: x, y2: y,
       brush_size: this.brushSize,
+      add: addToSelection, subtract: subtractFromSelection,
+    })
+    if (!response.ok) {
+      this.setStatus("Operation failed.")
+      this.renderOverlay()
+      return
+    }
+
+    const { mask_url } = await response.json()
+    this.drawMask(mask_url)
+    this.setStatus("")
+  }
+
+  // Rectangle select: click one corner, then click the opposite corner —
+  // every pixel in the axis-aligned rectangle between them is selected.
+  // Unlike line select there's no brush size (the whole enclosed area is
+  // filled, not stroked); otherwise the same two-click shape, submitting
+  // immediately on the second click with the same add/subtract modifiers.
+  async rectSelectClick(x, y, event) {
+    if (!this.rectSelectStart) {
+      this.rectSelectStart = { x, y }
+      this.renderOverlay()
+      return
+    }
+
+    const addToSelection = event.metaKey || event.ctrlKey
+    const subtractFromSelection = event.shiftKey
+    await this.submitRectSelect(x, y, addToSelection, subtractFromSelection)
+  }
+
+  async submitRectSelect(x, y, addToSelection, subtractFromSelection) {
+    const start = this.rectSelectStart
+    this.rectSelectStart = null
+    this.rectSelectPointer = null
+
+    this.setStatus("Working…")
+
+    const response = await this.post(this.rectSelectUrlValue, {
+      x1: start.x, y1: start.y, x2: x, y2: y,
       add: addToSelection, subtract: subtractFromSelection,
     })
     if (!response.ok) {
@@ -1272,6 +1345,8 @@ export default class extends Controller {
     this.freeSelectPoints = []
     this.lineSelectStart = null
     this.lineSelectPointer = null
+    this.rectSelectStart = null
+    this.rectSelectPointer = null
     this.cancelBrush()
     this.setStatus("Working…")
 
@@ -1411,6 +1486,10 @@ export default class extends Controller {
       this.renderLineSelectPreview(context)
     }
 
+    if (this.rectSelectStart) {
+      this.renderRectSelectPreview(context)
+    }
+
     if (this.splitSelectionLine) {
       this.renderSplitSelectionPreview(context)
     }
@@ -1438,6 +1517,34 @@ export default class extends Controller {
     context.fillStyle = "#3388ff"
     context.beginPath()
     context.arc(this.lineSelectStart.x, this.lineSelectStart.y, 3, 0, Math.PI * 2)
+    context.fill()
+  }
+
+  // Draws the in-progress rectangle select: a dashed rectangle outline from
+  // the placed first corner to the current pointer position, so the user can
+  // see exactly what area will be selected before the second click commits —
+  // plus a small dot marking the placed corner, same visual language as
+  // renderLineSelectPreview().
+  renderRectSelectPreview(context) {
+    const end = this.rectSelectPointer || this.rectSelectStart
+
+    context.setLineDash([4, 4])
+    context.lineWidth = 1
+    context.strokeStyle = "rgba(51, 136, 255, 0.8)"
+    context.fillStyle = "rgba(51, 136, 255, 0.15)"
+
+    const x = Math.min(this.rectSelectStart.x, end.x)
+    const y = Math.min(this.rectSelectStart.y, end.y)
+    const width = Math.abs(end.x - this.rectSelectStart.x)
+    const height = Math.abs(end.y - this.rectSelectStart.y)
+
+    context.fillRect(x, y, width, height)
+    context.strokeRect(x, y, width, height)
+    context.setLineDash([])
+
+    context.fillStyle = "#3388ff"
+    context.beginPath()
+    context.arc(this.rectSelectStart.x, this.rectSelectStart.y, 3, 0, Math.PI * 2)
     context.fill()
   }
 
