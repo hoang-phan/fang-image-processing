@@ -400,7 +400,7 @@ export default class extends Controller {
   }
 
   updateToolOptions() {
-    this.toleranceControlTarget.hidden = !["fuzzy_select", "gradient_select", "select_by_color"].includes(this.tool)
+    this.toleranceControlTarget.hidden = !["fuzzy_select", "gradient_select", "select_by_color", "smooth_auto_fill"].includes(this.tool)
     this.brushSizeControlTarget.hidden = this.tool !== "line_select" && this.tool !== "brush"
     this.brushSubmitControlTarget.hidden = this.tool !== "brush"
     this.editorMainTarget.classList.toggle("zoom-cursor", this.tool === "zoom")
@@ -926,7 +926,7 @@ export default class extends Controller {
     this.setStatus("Working…")
 
     const response = await this.post(this.smoothAutoFillUrlValue, {
-      x1: start.x, y1: start.y, x2: x, y2: y,
+      x1: start.x, y1: start.y, x2: x, y2: y, tolerance: this.tolerance,
     })
     if (!response.ok) {
       this.setStatus("Operation failed.")

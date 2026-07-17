@@ -287,7 +287,9 @@ module EditSessions
     # display_image and records a new canvas snapshot the same way delete
     # does; the mask itself is unchanged (carried forward implicitly, same as
     # delete's mask_bytes). Requires a selection, same guard as invert/delete —
-    # there's nothing to limit the fill to otherwise.
+    # there's nothing to limit the fill to otherwise. `tolerance` gates how far
+    # each end's anchor color averaging walks along the line — same Threshold
+    # tool option and default as fuzzy_select/gradient_select/select_by_color.
     def smooth_auto_fill
       return render_no_selection unless @edit_session.current_mask.attached?
 
@@ -297,7 +299,8 @@ module EditSessions
         x1: params.require(:x1).to_i,
         y1: params.require(:y1).to_i,
         x2: params.require(:x2).to_i,
-        y2: params.require(:y2).to_i
+        y2: params.require(:y2).to_i,
+        tolerance: params.fetch(:tolerance, 32).to_i
       )
 
       @edit_session.record_snapshot!(

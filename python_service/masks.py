@@ -379,18 +379,69 @@ def invert(mask):
     return cv2.bitwise_not(mask)
 
 
-def smooth_auto_fill(rgb, alpha, mask, x1, y1, x2, y2):
+def _anchor_run_average(line_order, start, step, flat_opaque, flat_rgb, tolerance):
+    """Walks along `line_order` from index `start` in direction `step` (+1 or
+    -1), starting at the non-transparent pixel immediately bordering a gap,
+    and collects every further pixel that is (a) contiguous — no transparent
+    gap breaks the walk, immediately stopping it — and (b) within `tolerance`
+    of the immediate bordering anchor's color (the same max-per-channel
+    tolerance test fuzzy_select/gradient_select use, just walked along a line
+    instead of flood-filled across an area, and always compared against the
+    fixed anchor pixel rather than neighbor-chained the way gradient_select
+    is, so a slow drift in the surrounding texture doesn't pull in colors
+    that no longer resemble the actual edge of the gap).
+
+    Returns the average RGB color of every pixel collected this way (at least
+    the anchor itself), which is what smooth_auto_fill now interpolates from
+    instead of that single bordering pixel — this is what keeps one outlier
+    pixel right at the gap's edge from being used verbatim as a gradient
+    endpoint.
+    """
+    anchor_color = flat_rgb[line_order[start]].astype(np.float64)
+    colors = [anchor_color]
+
+    i = start + step
+    while 0 <= i < len(line_order):
+        idx = line_order[i]
+        if not flat_opaque[idx]:
+            break
+        color = flat_rgb[idx].astype(np.float64)
+        if np.abs(color - anchor_color).max() > tolerance:
+            break
+        colors.append(color)
+        i += step
+
+    return np.mean(colors, axis=0)
+
+
+def smooth_auto_fill(rgb, alpha, mask, x1, y1, x2, y2, tolerance=32):
     """Smooth Auto Fill: given a direction vector from (x1, y1) to (x2, y2),
     sweeps a family of 1px-spaced parallel lines across the whole image. For
-    each line, walks in from both ends to find the closest non-transparent
-    pixel on either side, then linearly interpolates color between those two
-    anchors along the line. A line with no non-transparent anchor on one or
-    both ends is left untouched entirely (there's nothing to interpolate
-    between). The anchor pixels themselves are looked up from the full image
-    (`alpha`/`rgb`), not restricted to the selection — only the *write* is
-    restricted, to selected-and-transparent pixels (`mask` AND `alpha == 0`),
-    per the tool's spec: colors are sourced from wherever the nearest opaque
-    pixel is, but the fill never touches anything outside the selection or
+    each contiguous run of fillable (selected AND transparent) pixels along a
+    line, finds the closest non-transparent pixel immediately bordering that
+    run on either side — not the line's global extremes, since a line can
+    cross other unrelated opaque/transparent regions beyond the run being
+    filled.
+
+    Rather than interpolating straight from that single bordering pixel (which
+    tumbles hard if it happens to be an outlier — a stray dark/light speck
+    right at the gap's edge), each side continues walking further along the
+    line away from the gap via `_anchor_run_average`: it keeps collecting
+    pixels as long as they're contiguous (no transparent gap) and within
+    `tolerance` of the immediate bordering anchor's color, the same
+    color-similarity test fuzzy_select uses, just walked along a line instead
+    of flood-filled across an area. The average color of everything collected
+    this way is the actual gradient endpoint used for interpolation, so a
+    single-pixel outlier gets diluted by its similar neighbors instead of
+    dictating the whole gap's fill color. A run missing a bordering anchor on
+    either side (e.g. it runs off the edge of the image before hitting a
+    non-transparent pixel) is left untouched entirely — there's nothing to
+    interpolate between.
+
+    The anchor pixels themselves can be outside the selection (`mask`) — only
+    the *write* is restricted to selected-and-transparent pixels — per the
+    tool's spec: colors are sourced from wherever the nearest opaque pixel
+    is, but the fill never touches anything outside the selection or
     overwrites already-opaque pixels.
 
     Pixels are grouped into lines by rounding their perpendicular distance
@@ -444,30 +495,38 @@ def smooth_auto_fill(rgb, alpha, mask, x1, y1, x2, y2):
 
     for group in groups:
         line_order = group[np.argsort(flat_along[group], kind="stable")]
-        opaque_positions = np.flatnonzero(flat_opaque[line_order])
-        if opaque_positions.size == 0:
+        fillable_here = flat_fillable[line_order]
+        if not fillable_here.any():
             continue
 
-        first_idx = line_order[opaque_positions[0]]
-        last_idx = line_order[opaque_positions[-1]]
-        if first_idx == last_idx:
-            continue
+        # Contiguous runs of fillable positions along this line (indices into
+        # line_order) — each run is filled independently from its own two
+        # bordering anchors, since a single line can cross multiple separate
+        # gaps that shouldn't blend into each other's colors.
+        run_bounds = np.flatnonzero(np.diff(np.concatenate(([0], fillable_here.astype(np.int8), [0]))))
+        run_starts, run_ends = run_bounds[0::2], run_bounds[1::2]  # end is exclusive
 
-        start_t, end_t = flat_along[first_idx], flat_along[last_idx]
-        start_color = flat_rgb[first_idx].astype(np.float64)
-        end_color = flat_rgb[last_idx].astype(np.float64)
+        for run_start, run_end in zip(run_starts, run_ends):
+            before = run_start - 1
+            after = run_end
+            if before < 0 or after >= len(line_order):
+                continue
+            if not flat_opaque[line_order[before]] or not flat_opaque[line_order[after]]:
+                continue
 
-        to_fill = line_order[flat_fillable[line_order]]
-        to_fill = to_fill[(flat_along[to_fill] > start_t) & (flat_along[to_fill] < end_t)]
-        if to_fill.size == 0:
-            continue
+            start_idx = line_order[before]
+            end_idx = line_order[after]
+            start_t, end_t = flat_along[start_idx], flat_along[end_idx]
+            start_color = _anchor_run_average(line_order, before, -1, flat_opaque, flat_rgb, tolerance)
+            end_color = _anchor_run_average(line_order, after, 1, flat_opaque, flat_rgb, tolerance)
 
-        weight = (flat_along[to_fill] - start_t) / (end_t - start_t)
-        colors = start_color[None, :] + weight[:, None] * (end_color - start_color)[None, :]
+            to_fill = line_order[run_start:run_end]
+            weight = (flat_along[to_fill] - start_t) / (end_t - start_t)
+            colors = start_color[None, :] + weight[:, None] * (end_color - start_color)[None, :]
 
-        fill_ys, fill_xs = np.unravel_index(to_fill, (height, width))
-        out_rgb[fill_ys, fill_xs] = np.rint(colors).astype(np.uint8)
-        out_alpha[fill_ys, fill_xs] = 255
+            fill_ys, fill_xs = np.unravel_index(to_fill, (height, width))
+            out_rgb[fill_ys, fill_xs] = np.rint(colors).astype(np.uint8)
+            out_alpha[fill_ys, fill_xs] = 255
 
     return np.dstack([out_rgb, out_alpha])
 
