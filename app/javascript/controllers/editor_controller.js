@@ -41,6 +41,7 @@ export default class extends Controller {
     "imageCanvas", "overlayCanvas", "brushCanvas", "canvasStack", "editorMain", "status",
     "toolbar", "toolOptions", "toleranceControl", "toleranceSlider", "toleranceInput",
     "brushSizeControl", "brushSizeSlider", "brushSizeInput",
+    "brushSubmitControl",
     "zoomLevel",
     "borderSizeDialog", "borderSizeDialogTitle", "borderSizeInput",
     "mergeSelectionDialog", "savedSelectionList",
@@ -193,9 +194,9 @@ export default class extends Controller {
   }
 
   // Brush tool: mousedown starts a stroke, mousemove while down appends
-  // points, and mouseup commits it as a selection — same Shift/Ctrl/Cmd
-  // add/subtract/replace modifiers as every other select tool, read off the
-  // releasing event (the "drop") rather than off dedicated buttons. Kept as
+  // points, and mouseup ends that stroke without committing — strokes
+  // accumulate client-side until Add / Remove / New in the tool-options
+  // panel submits them (same pattern as fang-mesh-generation). Kept as
   // separate mousedown/mousemove/mouseup listeners rather than reusing
   // click() since a brush stroke is a continuous drag, not a discrete click.
   brushPointerDown(event) {
@@ -208,21 +209,20 @@ export default class extends Controller {
     this.renderBrushCanvas()
   }
 
-  brushPointerUp(event) {
+  brushPointerUp() {
     if (!this.brushDrawing) return
     this.brushDrawing = false
     this.currentBrushStroke = null
-
-    const add = event.shiftKey
-    const subtract = event.metaKey || event.ctrlKey
-    return this.enqueue(() => this.submitBrush({ add, subtract }))
+    this.renderBrushCanvas()
   }
 
-  // Clear the brush-size cursor preview when the pointer leaves the canvas,
-  // but do not end or commit the stroke — window mouseup is what commits
-  // (see brushPointerUp), so leaving mid-drag and releasing outside still
-  // selects what was painted, matching "drag to paint, drop to select."
+  // End the current stroke and clear the brush-size cursor preview when the
+  // pointer leaves the canvas — painted strokes stay so the user can keep
+  // dabbing after re-entering; only Escape / tool switch / a submit button
+  // clears or commits them.
   brushPointerLeave() {
+    this.brushDrawing = false
+    this.currentBrushStroke = null
     this.brushPointer = null
     this.renderBrushCanvas()
   }
@@ -406,6 +406,7 @@ export default class extends Controller {
   updateToolOptions() {
     this.toleranceControlTarget.hidden = !["fuzzy_select", "gradient_select", "select_by_color", "smooth_auto_fill"].includes(this.tool)
     this.brushSizeControlTarget.hidden = this.tool !== "line_select" && this.tool !== "brush"
+    this.brushSubmitControlTarget.hidden = this.tool !== "brush"
     this.editorMainTarget.classList.toggle("zoom-cursor", this.tool === "zoom")
     if (this.tool === "brush") {
       this.renderBrushCanvas()
@@ -414,10 +415,10 @@ export default class extends Controller {
     }
   }
 
-  // Escape, or switching tools mid-stroke, discards the in-progress brush
-  // stroke without submitting anything — painting is frontend-only until
-  // mouseup commits it (see DESIGN.md), so there's no server-side state to
-  // roll back here, just local state to drop.
+  // Escape, or switching tools mid-stroke, discards accumulated brush
+  // strokes without submitting anything — painting is frontend-only until
+  // Add / Remove / New commits it (see DESIGN.md), so there's no
+  // server-side state to roll back here, just local state to drop.
   cancelBrush() {
     if (this.brushStrokes.length === 0 && !this.brushDrawing) return
     this.brushStrokes = []
@@ -1010,10 +1011,22 @@ export default class extends Controller {
     context.clearRect(0, 0, this.brushCanvasTarget.width, this.brushCanvasTarget.height)
   }
 
-  // Commits the stroke painted since the last mousedown. Called from
-  // brushPointerUp with add/subtract taken from that mouseup's Shift /
-  // Ctrl/Cmd keys — same mask_with_modifier semantics as every other
-  // select tool's committing click.
+  // Tool-options commit buttons for Brush: paint accumulates locally, then
+  // Add unions into the current selection, Remove subtracts, New replaces.
+  // Same mask_with_modifier semantics as every other select tool's Shift /
+  // Ctrl/Cmd modifiers — just chosen via buttons instead of mouseup keys.
+  submitBrushAdd() {
+    return this.enqueue(() => this.submitBrush({ add: true, subtract: false }))
+  }
+
+  submitBrushRemove() {
+    return this.enqueue(() => this.submitBrush({ add: false, subtract: true }))
+  }
+
+  submitBrushNew() {
+    return this.enqueue(() => this.submitBrush({ add: false, subtract: false }))
+  }
+
   async submitBrush({ add, subtract }) {
     if (this.brushStrokes.length === 0) return
 
