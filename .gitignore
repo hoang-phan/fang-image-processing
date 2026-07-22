@@ -33,7 +33,6 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
-DESIGN.md
 .claude
 storage/*
 python_service/.venv
