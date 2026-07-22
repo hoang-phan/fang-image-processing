@@ -41,7 +41,6 @@ export default class extends Controller {
     "imageCanvas", "overlayCanvas", "brushCanvas", "canvasStack", "editorMain", "status",
     "toolbar", "toolOptions", "toleranceControl", "toleranceSlider", "toleranceInput",
     "brushSizeControl", "brushSizeSlider", "brushSizeInput",
-    "brushSubmitControl",
     "zoomLevel",
     "borderSizeDialog", "borderSizeDialogTitle", "borderSizeInput",
     "mergeSelectionDialog", "savedSelectionList",
@@ -194,9 +193,9 @@ export default class extends Controller {
   }
 
   // Brush tool: mousedown starts a stroke, mousemove while down appends
-  // points, and mouseup ends that stroke without committing — strokes
-  // accumulate client-side until Add / Remove / New in the tool-options
-  // panel submits them (same pattern as fang-mesh-generation). Kept as
+  // points, and mouseup commits it as a selection — same Shift/Ctrl/Cmd
+  // add/subtract/replace modifiers as every other select tool, read off the
+  // releasing event (the "drop") rather than off dedicated buttons. Kept as
   // separate mousedown/mousemove/mouseup listeners rather than reusing
   // click() since a brush stroke is a continuous drag, not a discrete click.
   brushPointerDown(event) {
@@ -209,20 +208,21 @@ export default class extends Controller {
     this.renderBrushCanvas()
   }
 
-  brushPointerUp() {
+  brushPointerUp(event) {
     if (!this.brushDrawing) return
     this.brushDrawing = false
     this.currentBrushStroke = null
-    this.renderBrushCanvas()
+
+    const add = event.shiftKey
+    const subtract = event.metaKey || event.ctrlKey
+    return this.enqueue(() => this.submitBrush({ add, subtract }))
   }
 
-  // End the current stroke and clear the brush-size cursor preview when the
-  // pointer leaves the canvas — painted strokes stay so the user can keep
-  // dabbing after re-entering; only Escape / tool switch / a submit button
-  // clears or commits them.
+  // Clear the brush-size cursor preview when the pointer leaves the canvas,
+  // but do not end or commit the stroke — window mouseup is what commits
+  // (see brushPointerUp), so leaving mid-drag and releasing outside still
+  // selects what was painted, matching "drag to paint, drop to select."
   brushPointerLeave() {
-    this.brushDrawing = false
-    this.currentBrushStroke = null
     this.brushPointer = null
     this.renderBrushCanvas()
   }
@@ -406,7 +406,6 @@ export default class extends Controller {
   updateToolOptions() {
     this.toleranceControlTarget.hidden = !["fuzzy_select", "gradient_select", "select_by_color", "smooth_auto_fill"].includes(this.tool)
     this.brushSizeControlTarget.hidden = this.tool !== "line_select" && this.tool !== "brush"
-    this.brushSubmitControlTarget.hidden = this.tool !== "brush"
     this.editorMainTarget.classList.toggle("zoom-cursor", this.tool === "zoom")
     if (this.tool === "brush") {
       this.renderBrushCanvas()
@@ -415,10 +414,10 @@ export default class extends Controller {
     }
   }
 
-  // Escape, or switching tools mid-stroke, discards accumulated brush
-  // strokes without submitting anything — painting is frontend-only until
-  // Add / Remove / New commits it (see DESIGN.md), so there's no
-  // server-side state to roll back here, just local state to drop.
+  // Escape, or switching tools mid-stroke, discards the in-progress brush
+  // stroke without submitting anything — painting is frontend-only until
+  // mouseup commits it (see DESIGN.md), so there's no server-side state to
+  // roll back here, just local state to drop.
   cancelBrush() {
     if (this.brushStrokes.length === 0 && !this.brushDrawing) return
     this.brushStrokes = []
@@ -944,18 +943,14 @@ export default class extends Controller {
     this.setStatus("")
   }
 
-  // Brush tool (GIMP foreground-select style): draws entirely client-side
-  // for the life of one drag — nothing is sent to Rails until mouseup, so
-  // freehand dragging never round-trips per frame. While the tool is active,
-  // the whole canvas is tinted blue and the in-progress stroke punches a
-  // hole in that tint (via "destination-out", see punchBrushStroke()) so the
-  // original image shows through wherever the user has drawn — the same
-  // visual language as GIMP's foreground/quick-mask select tools, just to
-  // make the in-progress drawing legible against the tint. The uncommitted
-  // stroke lives on its own canvas layer (brushCanvasTarget), stacked
-  // between the image and the marching-ants overlay, so committing is just
-  // a fetch + drawMask() the same as every other tool and this layer gets
-  // cleared, never touching selectionPath itself.
+  // Brush tool: draws entirely client-side for the life of one drag — nothing
+  // is sent to Rails until mouseup, so freehand dragging never round-trips
+  // per frame. The in-progress stroke (and idle brush-size cursor) live on
+  // their own canvas layer (brushCanvasTarget), stacked between the image
+  // and the marching-ants overlay, drawn as a translucent preview the same
+  // way line select previews its segment — no full-canvas tint. Committing
+  // is just a fetch + drawMask() the same as every other tool and this
+  // layer gets cleared, never touching selectionPath itself.
   renderBrushCanvas() {
     const canvas = this.brushCanvasTarget
     const context = canvas.getContext("2d")
@@ -963,20 +958,13 @@ export default class extends Controller {
 
     if (this.tool !== "brush") return
 
-    context.globalCompositeOperation = "source-over"
-    context.fillStyle = "rgba(51, 136, 255, 0.35)"
-    context.fillRect(0, 0, canvas.width, canvas.height)
-
-    context.globalCompositeOperation = "destination-out"
-    context.fillStyle = "rgba(0, 0, 0, 1)"
-    context.strokeStyle = "rgba(0, 0, 0, 1)"
+    context.fillStyle = "rgba(51, 136, 255, 0.5)"
+    context.strokeStyle = "rgba(51, 136, 255, 0.5)"
     context.lineWidth = this.brushSize
     context.lineCap = "round"
     context.lineJoin = "round"
 
-    this.brushStrokes.forEach((points) => this.punchBrushStroke(context, points))
-
-    context.globalCompositeOperation = "source-over"
+    this.brushStrokes.forEach((points) => this.drawBrushStroke(context, points))
 
     if (this.brushPointer && !this.brushDrawing) {
       context.strokeStyle = "rgba(255, 255, 255, 0.9)"
@@ -987,10 +975,10 @@ export default class extends Controller {
     }
   }
 
-  // Punches one stroke's path out of the blue tint. A single point (a click
-  // with no drag) needs an explicit dot — stroke()ing a zero-length path
-  // draws nothing even with round line caps.
-  punchBrushStroke(context, points) {
+  // Draws one in-progress stroke as a translucent preview. A single point
+  // (a click with no drag) needs an explicit filled circle — stroke()ing a
+  // zero-length path draws nothing even with round line caps.
+  drawBrushStroke(context, points) {
     if (points.length === 0) return
 
     if (points.length === 1) {
@@ -1011,22 +999,10 @@ export default class extends Controller {
     context.clearRect(0, 0, this.brushCanvasTarget.width, this.brushCanvasTarget.height)
   }
 
-  // Tool-options commit buttons for Brush: paint accumulates locally, then
-  // Add unions into the current selection, Remove subtracts, New replaces.
-  // Same mask_with_modifier semantics as every other select tool's Shift /
-  // Ctrl/Cmd modifiers — just chosen via buttons instead of mouseup keys.
-  submitBrushAdd() {
-    return this.enqueue(() => this.submitBrush({ add: true, subtract: false }))
-  }
-
-  submitBrushRemove() {
-    return this.enqueue(() => this.submitBrush({ add: false, subtract: true }))
-  }
-
-  submitBrushNew() {
-    return this.enqueue(() => this.submitBrush({ add: false, subtract: false }))
-  }
-
+  // Commits the stroke painted since the last mousedown. Called from
+  // brushPointerUp with add/subtract taken from that mouseup's Shift /
+  // Ctrl/Cmd keys — same mask_with_modifier semantics as every other
+  // select tool's committing click.
   async submitBrush({ add, subtract }) {
     if (this.brushStrokes.length === 0) return
 

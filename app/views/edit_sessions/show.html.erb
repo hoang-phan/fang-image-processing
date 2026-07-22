@@ -59,7 +59,7 @@
       </button>
 
       <button type="button" class="tool-button" data-tool="brush"
-              data-action="editor#selectTool" title="Brush (B) — drag to paint, then Add / Remove / New in Tool Options">
+              data-action="editor#selectTool" title="Brush (B) — drag to paint, release to select (Shift: Add, Ctrl/Cmd: Subtract)">
         <i class="bi bi-brush"></i>
       </button>
 
@@ -122,24 +122,6 @@
         <input type="range" min="1" max="200" step="1" id="brush-size-slider"
                class="tool-option-slider" data-editor-target="brushSizeSlider"
                data-action="input->editor#brushSizeSliderChanged">
-      </div>
-
-      <div class="tool-option-row brush-submit-row" data-editor-target="brushSubmitControl" hidden>
-        <label>Brush Selection</label>
-        <div class="brush-submit-button-list">
-          <button type="button" class="brush-submit-button" data-action="editor#submitBrushAdd"
-                  title="Add painted strokes to the current selection">
-            <i class="bi bi-plus-lg" aria-hidden="true"></i> Add
-          </button>
-          <button type="button" class="brush-submit-button" data-action="editor#submitBrushRemove"
-                  title="Remove painted strokes from the current selection">
-            <i class="bi bi-dash-lg" aria-hidden="true"></i> Remove
-          </button>
-          <button type="button" class="brush-submit-button" data-action="editor#submitBrushNew"
-                  title="Replace the current selection with the painted strokes">
-            <i class="bi bi-plus-square" aria-hidden="true"></i> New
-          </button>
-        </div>
       </div>
     </div>
 
@@ -252,6 +234,6 @@
     <span data-editor-target="status"></span>
     <span class="spacer"></span>
     <span class="zoom-level" data-editor-target="zoomLevel"></span>
-    <span class="hint">U: Fuzzy Select (Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; F: Free Select (click first point to close, Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; G: Gradient Select (Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; O: Select by Color (selects every matching pixel in the image, Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; L: Line Select (click two points, Shift+Click on second: Add, Ctrl/Cmd+Click: Subtract) &middot; R: Rectangle Select (click two opposite corners, Shift+Click on second: Add, Ctrl/Cmd+Click: Subtract) &middot; B: Brush (drag to paint, then Add / Remove / New in Tool Options) &middot; S: Split Selection (requires a selection; click two points to set the split line's direction, then click the side to keep) &middot; A: Smooth Auto Fill (requires a selection; click two points to set a fill direction, smoothly blends transparent pixels along parallel lines between the nearest opaque colors on each end) &middot; Zoom tool: Click in, Ctrl/Cmd+Click out &middot; Ctrl/Cmd+A: Select All &middot; Ctrl/Cmd+D: Deselect &middot; Ctrl/Cmd+I: Invert &middot; Remove Holes: sidebar button &middot; Grow Selection / Select Border: sidebar buttons &middot; Gradient Select from Selection: sidebar button (uses Threshold, extends outward from selection boundary) &middot; Delete/Backspace: Clear selection &middot; Ctrl/Cmd+Z: Undo &middot; Ctrl/Cmd+Shift+Z: Redo &middot; +/-: Zoom &middot; 0: Reset Zoom &middot; Ctrl/Cmd+Shift+O: Upload New &middot; Ctrl/Cmd+O: Load Session</span>
+    <span class="hint">U: Fuzzy Select (Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; F: Free Select (click first point to close, Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; G: Gradient Select (Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; O: Select by Color (selects every matching pixel in the image, Shift+Click: Add, Ctrl/Cmd+Click: Subtract) &middot; L: Line Select (click two points, Shift+Click on second: Add, Ctrl/Cmd+Click: Subtract) &middot; R: Rectangle Select (click two opposite corners, Shift+Click on second: Add, Ctrl/Cmd+Click: Subtract) &middot; B: Brush (drag to paint, release to select; Shift: Add, Ctrl/Cmd: Subtract) &middot; S: Split Selection (requires a selection; click two points to set the split line's direction, then click the side to keep) &middot; A: Smooth Auto Fill (requires a selection; click two points to set a fill direction, smoothly blends transparent pixels along parallel lines between the nearest opaque colors on each end) &middot; Zoom tool: Click in, Ctrl/Cmd+Click out &middot; Ctrl/Cmd+A: Select All &middot; Ctrl/Cmd+D: Deselect &middot; Ctrl/Cmd+I: Invert &middot; Remove Holes: sidebar button &middot; Grow Selection / Select Border: sidebar buttons &middot; Gradient Select from Selection: sidebar button (uses Threshold, extends outward from selection boundary) &middot; Delete/Backspace: Clear selection &middot; Ctrl/Cmd+Z: Undo &middot; Ctrl/Cmd+Shift+Z: Redo &middot; +/-: Zoom &middot; 0: Reset Zoom &middot; Ctrl/Cmd+Shift+O: Upload New &middot; Ctrl/Cmd+O: Load Session</span>
   </div>
 </div>
