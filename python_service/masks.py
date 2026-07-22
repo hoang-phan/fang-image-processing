@@ -292,8 +292,8 @@ def combine(mask_a, mask_b):
 
 
 def subtract(mask_a, mask_b):
-    """Removes mask_b's selected pixels from mask_a — the Shift+click
-    modifier's counterpart to combine's Ctrl/Cmd+click union (see
+    """Removes mask_b's selected pixels from mask_a — the Ctrl/Cmd+click
+    modifier's counterpart to combine's Shift+click union (see
     DESIGN.md §1/§4).
     """
     return cv2.bitwise_and(mask_a, cv2.bitwise_not(mask_b))

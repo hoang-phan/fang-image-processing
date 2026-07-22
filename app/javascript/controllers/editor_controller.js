@@ -40,7 +40,7 @@ export default class extends Controller {
   static targets = [
     "imageCanvas", "overlayCanvas", "brushCanvas", "canvasStack", "editorMain", "status",
     "toolbar", "toolOptions", "toleranceControl", "toleranceSlider", "toleranceInput",
-    "brushSizeControl", "brushSizeSlider", "brushSizeInput", "brushSubmitControl",
+    "brushSizeControl", "brushSizeSlider", "brushSizeInput",
     "zoomLevel",
     "borderSizeDialog", "borderSizeDialogTitle", "borderSizeInput",
     "mergeSelectionDialog", "savedSelectionList",
@@ -192,11 +192,12 @@ export default class extends Controller {
     }
   }
 
-  // Brush tool: mousedown starts a new stroke (a fresh point array pushed
-  // onto this.brushStrokes), mousemove while down appends points to it, and
-  // mouseup/mouseleave end the drag. Kept as separate mousedown/mousemove/
-  // mouseup listeners rather than reusing click() since a brush stroke is a
-  // continuous drag, not a discrete click the way every other tool's input is.
+  // Brush tool: mousedown starts a stroke, mousemove while down appends
+  // points, and mouseup commits it as a selection — same Shift/Ctrl/Cmd
+  // add/subtract/replace modifiers as every other select tool, read off the
+  // releasing event (the "drop") rather than off dedicated buttons. Kept as
+  // separate mousedown/mousemove/mouseup listeners rather than reusing
+  // click() since a brush stroke is a continuous drag, not a discrete click.
   brushPointerDown(event) {
     if (this.tool !== "brush") return
     if (event.button !== 0) return
@@ -207,18 +208,21 @@ export default class extends Controller {
     this.renderBrushCanvas()
   }
 
-  brushPointerUp() {
+  brushPointerUp(event) {
     if (!this.brushDrawing) return
     this.brushDrawing = false
     this.currentBrushStroke = null
+
+    const add = event.shiftKey
+    const subtract = event.metaKey || event.ctrlKey
+    return this.enqueue(() => this.submitBrush({ add, subtract }))
   }
 
-  // Ending the drag if the pointer leaves the canvas mid-stroke (rather than
-  // continuing to record points off-canvas) matches how mouseup would behave
-  // if released just inside the edge — avoids a stroke silently continuing
-  // to accumulate far-away coordinates the user can no longer see.
+  // Clear the brush-size cursor preview when the pointer leaves the canvas,
+  // but do not end or commit the stroke — window mouseup is what commits
+  // (see brushPointerUp), so leaving mid-drag and releasing outside still
+  // selects what was painted, matching "drag to paint, drop to select."
   brushPointerLeave() {
-    this.brushPointerUp()
     this.brushPointer = null
     this.renderBrushCanvas()
   }
@@ -402,7 +406,6 @@ export default class extends Controller {
   updateToolOptions() {
     this.toleranceControlTarget.hidden = !["fuzzy_select", "gradient_select", "select_by_color", "smooth_auto_fill"].includes(this.tool)
     this.brushSizeControlTarget.hidden = this.tool !== "line_select" && this.tool !== "brush"
-    this.brushSubmitControlTarget.hidden = this.tool !== "brush"
     this.editorMainTarget.classList.toggle("zoom-cursor", this.tool === "zoom")
     if (this.tool === "brush") {
       this.renderBrushCanvas()
@@ -411,16 +414,17 @@ export default class extends Controller {
     }
   }
 
-  // Escape, or switching tools mid-drawing, discards every uncommitted brush
-  // stroke without submitting anything — brush strokes are frontend-only
-  // until one of the three submission buttons runs (see DESIGN.md), so
-  // there's no server-side state to roll back here, just local state to drop.
+  // Escape, or switching tools mid-stroke, discards the in-progress brush
+  // stroke without submitting anything — painting is frontend-only until
+  // mouseup commits it (see DESIGN.md), so there's no server-side state to
+  // roll back here, just local state to drop.
   cancelBrush() {
-    if (this.brushStrokes.length === 0) return
+    if (this.brushStrokes.length === 0 && !this.brushDrawing) return
     this.brushStrokes = []
     this.brushDrawing = false
     this.currentBrushStroke = null
     this.clearBrushCanvas()
+    if (this.tool === "brush") this.renderBrushCanvas()
     this.setStatus("")
   }
 
@@ -630,8 +634,8 @@ export default class extends Controller {
 
   // GIMP-style zoom tool: plain click zooms in, Ctrl/Cmd+click zooms out,
   // both anchored on the clicked point so that exact image pixel stays
-  // under the cursor after rescaling — same modifier convention as fuzzy
-  // select's add-to-selection (see click()).
+  // under the cursor after rescaling. (Ctrl/Cmd here means zoom-out, not
+  // the select-tool subtract modifier — see click().)
   zoomAtEvent(event, direction) {
     const main = this.editorMainTarget
     const mainRect = main.getBoundingClientRect()
@@ -672,16 +676,16 @@ export default class extends Controller {
   }
 
   // Dispatches a canvas click to whichever tool is active. Fuzzy select on a
-  // plain click; Ctrl/Cmd+click adds the clicked region to the existing
+  // plain click; Shift+click adds the clicked region to the existing
   // selection (GIMP's "add to selection" modifier, replacing the old
-  // standalone "combine" tool); Shift+click instead subtracts the clicked
+  // standalone "combine" tool); Ctrl/Cmd+click instead subtracts the clicked
   // region from the existing selection ("subtract from selection" modifier,
   // the counterpart to add — see mask_with_modifier in the Rails controller).
   // Select by Color shares this same branch (see selectUrlForTool()): unlike
   // fuzzy select it matches every pixel in the image within tolerance of the
   // clicked color, not just the connected region, which is what makes it
   // useful for selecting scattered/disconnected pixels (e.g. stray hairs) in
-  // one click instead of Ctrl/Cmd+clicking each disconnected patch.
+  // one click instead of Shift+clicking each disconnected patch.
   // Zoom tool: plain click zooms in, Ctrl/Cmd+click zooms out, both anchored
   // on the click point (see zoomAtEvent()). Free select: clicks add path
   // points instead of firing a request per click (see freeSelectClick()).
@@ -725,8 +729,8 @@ export default class extends Controller {
       return
     }
 
-    const addToSelection = event.metaKey || event.ctrlKey
-    const subtractFromSelection = event.shiftKey
+    const addToSelection = event.shiftKey
+    const subtractFromSelection = event.metaKey || event.ctrlKey
 
     this.setStatus("Working…")
 
@@ -774,14 +778,14 @@ export default class extends Controller {
   // in-progress path. The first point is drawn as an enlarged handle (see
   // renderOverlay()) — clicking back within its hit radius closes the path
   // and submits the polygon as a selection, same as completing a round trip
-  // in GIMP. Ctrl/Cmd+click on that closing click adds the result to the
+  // in GIMP. Shift+click on that closing click adds the result to the
   // current selection instead of replacing it, mirroring fuzzy select's
-  // add-to-selection modifier; Shift+click on the closing click instead
+  // add-to-selection modifier; Ctrl/Cmd+click on the closing click instead
   // subtracts the polygon from the current selection.
   async freeSelectClick(x, y, event) {
     if (this.freeSelectPoints.length >= 3 && this.isNearFirstPoint(x, y)) {
-      const addToSelection = event.metaKey || event.ctrlKey
-      const subtractFromSelection = event.shiftKey
+      const addToSelection = event.shiftKey
+      const subtractFromSelection = event.metaKey || event.ctrlKey
       await this.submitFreeSelect(addToSelection, subtractFromSelection)
       return
     }
@@ -822,9 +826,9 @@ export default class extends Controller {
   // Line select: click one point, then click a second point — every pixel
   // on the segment between them (stroked to Brush Size width) is added to
   // the selection. Unlike free select there's no closing gesture; the
-  // second click submits immediately. Ctrl/Cmd+click on that second click
+  // second click submits immediately. Shift+click on that second click
   // unions the line into the current selection (same modifier convention as
-  // every other select tool); Shift+click subtracts it instead.
+  // every other select tool); Ctrl/Cmd+click subtracts it instead.
   async lineSelectClick(x, y, event) {
     if (!this.lineSelectStart) {
       this.lineSelectStart = { x, y }
@@ -832,8 +836,8 @@ export default class extends Controller {
       return
     }
 
-    const addToSelection = event.metaKey || event.ctrlKey
-    const subtractFromSelection = event.shiftKey
+    const addToSelection = event.shiftKey
+    const subtractFromSelection = event.metaKey || event.ctrlKey
     await this.submitLineSelect(x, y, addToSelection, subtractFromSelection)
   }
 
@@ -872,8 +876,8 @@ export default class extends Controller {
       return
     }
 
-    const addToSelection = event.metaKey || event.ctrlKey
-    const subtractFromSelection = event.shiftKey
+    const addToSelection = event.shiftKey
+    const subtractFromSelection = event.metaKey || event.ctrlKey
     await this.submitRectSelect(x, y, addToSelection, subtractFromSelection)
   }
 
@@ -940,18 +944,17 @@ export default class extends Controller {
   }
 
   // Brush tool (GIMP foreground-select style): draws entirely client-side
-  // while strokes accumulate in this.brushStrokes — nothing is sent to Rails
-  // until the user picks Add/Remove/New Selection from the tool options, so
-  // freehand dragging never round-trips per frame. While active, the whole
-  // canvas is tinted blue and every painted stroke punches a hole in that
-  // tint (via "destination-out", see punchBrushStroke()) so the original
-  // image shows through wherever the user has drawn — the same visual
-  // language as GIMP's foreground/quick-mask select tools, just to make the
-  // in-progress drawing legible against the tint rather than to hide it.
-  // Uncommitted strokes live on their own canvas layer (brushCanvasTarget),
-  // stacked between the image and the marching-ants overlay, so committing
-  // is just a fetch + drawMask() the same as every other tool and this
-  // layer gets cleared, never touching selectionPath itself.
+  // for the life of one drag — nothing is sent to Rails until mouseup, so
+  // freehand dragging never round-trips per frame. While the tool is active,
+  // the whole canvas is tinted blue and the in-progress stroke punches a
+  // hole in that tint (via "destination-out", see punchBrushStroke()) so the
+  // original image shows through wherever the user has drawn — the same
+  // visual language as GIMP's foreground/quick-mask select tools, just to
+  // make the in-progress drawing legible against the tint. The uncommitted
+  // stroke lives on its own canvas layer (brushCanvasTarget), stacked
+  // between the image and the marching-ants overlay, so committing is just
+  // a fetch + drawMask() the same as every other tool and this layer gets
+  // cleared, never touching selectionPath itself.
   renderBrushCanvas() {
     const canvas = this.brushCanvasTarget
     const context = canvas.getContext("2d")
@@ -1007,25 +1010,10 @@ export default class extends Controller {
     context.clearRect(0, 0, this.brushCanvasTarget.width, this.brushCanvasTarget.height)
   }
 
-  // The three submission buttons in the brush tool's options: Add unions the
-  // painted strokes into the current selection, Remove subtracts them,
-  // New Selection replaces the current selection with just the painted
-  // strokes — same add/subtract/replace semantics as every other select
-  // tool's modifier keys (see mask_with_modifier server-side), just exposed
-  // as buttons instead of Ctrl/Cmd/Shift because a brush stroke is drawn
-  // over multiple mousedowns rather than ending on a single qualifying click.
-  submitBrushAdd() {
-    return this.enqueue(() => this.submitBrush({ add: true, subtract: false }))
-  }
-
-  submitBrushRemove() {
-    return this.enqueue(() => this.submitBrush({ add: false, subtract: true }))
-  }
-
-  submitBrushNew() {
-    return this.enqueue(() => this.submitBrush({ add: false, subtract: false }))
-  }
-
+  // Commits the stroke painted since the last mousedown. Called from
+  // brushPointerUp with add/subtract taken from that mouseup's Shift /
+  // Ctrl/Cmd keys — same mask_with_modifier semantics as every other
+  // select tool's committing click.
   async submitBrush({ add, subtract }) {
     if (this.brushStrokes.length === 0) return
 
@@ -1034,6 +1022,7 @@ export default class extends Controller {
     this.brushDrawing = false
     this.currentBrushStroke = null
     this.clearBrushCanvas()
+    if (this.tool === "brush") this.renderBrushCanvas()
 
     this.setStatus("Working…")
 

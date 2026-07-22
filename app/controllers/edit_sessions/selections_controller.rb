@@ -367,14 +367,17 @@ module EditSessions
       @pixel_engine ||= PixelEngineClient.new
     end
 
-    # Shared by fuzzy_select, free_select, line_select, and brush_select: Ctrl/Cmd+click (params[:add])
-    # unions the newly selected region into the current selection instead of
-    # replacing it — the same union behavior the old standalone "combine"
-    # tool performed, now reached as a modifier on either select tool. Shift
-    # +click (params[:subtract]) instead removes the newly selected region
-    # from the current selection. The two modifiers are mutually exclusive;
-    # if neither is set (or there's no existing selection to modify), the
-    # region replaces the current selection as normal (see DESIGN.md §1/§4).
+    # Shared by fuzzy_select, free_select, line_select, rect_select, and
+    # brush_select: Shift (params[:add]) unions the newly selected region into
+    # the current selection instead of replacing it — the same union behavior
+    # the old standalone "combine" tool performed, now reached as a modifier
+    # on any of those select tools (Shift+click for click-based tools,
+    # Shift+mouseup for brush). Ctrl/Cmd (params[:subtract]) instead removes
+    # the newly selected region from the current selection. The two modifiers
+    # are mutually exclusive; if neither is set (or there's no existing
+    # selection to modify), the region replaces the current selection as
+    # normal (see DESIGN.md §1/§4). GIMP-matching key mapping: Shift = add,
+    # Ctrl = subtract.
     def mask_with_modifier(region_mask)
       return region_mask unless @edit_session.current_mask.attached?
 
@@ -418,7 +421,7 @@ module EditSessions
 
     # Every action here reads current_mask, does a (comparatively slow)
     # PixelEngineClient round-trip, and writes a new snapshot from what it
-    # read — a classic read-modify-write. Two Ctrl/Cmd+click requests fired
+    # read — a classic read-modify-write. Two Shift+click (add) requests fired
     # in quick succession (Puma runs multiple threads per DESIGN.md) can
     # otherwise interleave: request B reads current_mask before request A's
     # record_snapshot! commits, so B's write clobbers A's, silently dropping
